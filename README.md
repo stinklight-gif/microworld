@@ -384,22 +384,45 @@ interface WorldState {
 - **State:** React state + useReducer for world simulation loop
 - **Deployment:** Vercel
 
-### Environment Variables
+### Environment Variables (Vercel only — not run locally)
 
-```env
+All environment variables are set in Vercel project settings. No `.env` files.
+
+```
 LLM_BASE_URL=https://api.moonshot.ai/v1
-LLM_API_KEY=<key>
+LLM_API_KEY=<set in Vercel env vars>
 LLM_MODEL=kimi-k2.5
 ```
 
+### Simulation Controls
+
+- **Play / Pause / Step** — Pause at any tick, step forward one tick at a time, or let it run
+- **Speed slider** — 1 tick/sec (watch everything) → 100 ticks/sec (fast forward)
+- **Stop & Reset** — End simulation, reset to tick 0 with new random agents
+- **Save state** — Snapshot current world state to resume later (localStorage or Supabase)
+- **Load state** — Resume a saved simulation from any tick
+- **Experiment selector** — Dropdown to pick a pre-configured scenario
+
+### Sharing / Remote Viewing
+
+The simulation runs server-side via API routes (NOT client-side). This means:
+- The app is deployed on Vercel — anyone with the URL can watch the live simulation
+- Multiple viewers can observe simultaneously
+- The simulation state is persisted server-side (Supabase or in-memory with SSE/WebSocket push to viewers)
+- Real-time updates pushed to all connected browsers via Server-Sent Events (SSE)
+
+This allows Samantha (or anyone with the URL) to monitor the simulation remotely.
+
 ### Key Implementation Notes
 
-- Simulation runs client-side in the browser (requestAnimationFrame loop with configurable tick speed)
-- LLM calls go through a Next.js API route (`/api/think`) to keep the API key server-side
+- Simulation loop runs server-side (Next.js API route or edge function), NOT in the browser
+- LLM calls go through server-side `/api/think` route (API key stays on Vercel, never exposed)
 - The API route receives batch requests: array of agent states → array of decisions
+- State updates pushed to connected clients via SSE (`/api/stream`)
 - Chat feed is a virtualized scrolling list (react-window or similar) to handle thousands of messages
-- Map canvas re-renders on each tick
+- Map canvas re-renders on each state update from SSE
 - Charts update every 10 ticks (not every tick — performance)
+- All viewers see the same live state — no per-client simulation
 
 ---
 

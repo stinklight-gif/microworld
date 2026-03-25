@@ -403,15 +403,47 @@ LLM_MODEL=kimi-k2.5
 - **Load state** — Resume a saved simulation from any tick
 - **Experiment selector** — Dropdown to pick a pre-configured scenario
 
-### Sharing / Remote Viewing
+### Access Control
 
-The simulation runs server-side via API routes (NOT client-side). This means:
-- The app is deployed on Vercel — anyone with the URL can watch the live simulation
-- Multiple viewers can observe simultaneously
-- The simulation state is persisted server-side (Supabase or in-memory with SSE/WebSocket push to viewers)
-- Real-time updates pushed to all connected browsers via Server-Sent Events (SSE)
+The app is **private** — protected by authentication (Clerk, same as Mission Control). Only authorized users can view the simulation.
 
-This allows Samantha (or anyone with the URL) to monitor the simulation remotely.
+### Samantha API (External Monitoring)
+
+A read-only API endpoint allows Samantha (AI assistant) to query simulation state programmatically:
+
+```
+GET /api/monitor?key=<MONITOR_API_KEY>
+```
+
+Returns:
+```json
+{
+  "tick": 472,
+  "running": true,
+  "population": 218,
+  "population_by_type": { "farmer": 71, "builder": 68, "energist": 42, "generalist": 37 },
+  "gini_coefficient": 0.34,
+  "avg_health": 72.4,
+  "recent_events": [
+    "[Tick 472] 🌾 Agent_12 → 🏗️ Agent_8: traded 4 food for 2 shelter ✅",
+    "[Tick 471] 💀 Agent_55 died. Starvation.",
+    "[Tick 470] 🎉 Agent_12 spawned Agent_89 (child)"
+  ],
+  "top_agents": [...],
+  "bottom_agents": [...]
+}
+```
+
+Environment variable:
+```
+MONITOR_API_KEY=<set in Vercel env vars>
+```
+
+Samantha polls this endpoint periodically to:
+- Report interesting events ("Agent_12 just built a 3-employee business empire")
+- Alert on crises ("Mass die-off in the northwest — 40% population drop")
+- Track experiments ("Famine scenario: trade volume spiked 300% after the shock")
+- Log highlights to daily notes
 
 ### Key Implementation Notes
 

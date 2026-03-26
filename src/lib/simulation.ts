@@ -782,60 +782,106 @@ export function tickWorld(state: WorldState): WorldState {
     });
   }
 
-  // 5.6 HIRE — Agents hire workers when surplus is high (LLM-driven)
+  // 5.6 HIRE — Agents post jobs, nearby unemployed agents evaluate & accept/reject
   for (const id of order) {
     const agent = agents[id];
     if (!agent.alive) continue;
 
-    // Only hire if LLM strategic plan says to
+    // Only hire if LLM strategic plan says to, or rule-based if very wealthy
     const llmWantsHire = agent.strategic_plan?.should_hire === true;
-    if (!llmWantsHire) continue;
+    const ruleBasedHire = agent.inventory.food > 10 && agent.inventory.shelter > 6 && agent.employee_ids.length === 0;
+    if (!llmWantsHire && !ruleBasedHire) continue;
 
-    // Check hiring prerequisites
+    // Check hiring prerequisites — employer must have surplus to pay signing bonus
     if (
       agent.inventory.food < HIRING_THRESHOLDS.min_food ||
-      agent.inventory.shelter < HIRING_THRESHOLDS.min_shelter ||
-      agent.inventory.energy < HIRING_THRESHOLDS.min_energy
+      agent.inventory.shelter < HIRING_THRESHOLDS.min_shelter
     ) continue;
 
-    const emptyCells = getEmptyAdjacentCells(grid, agent.position.x, agent.position.y);
-    if (emptyCells.length === 0) continue;
+    // Already have too many workers? Cap at 3
+    if (agent.employee_ids.length >= 3) continue;
 
-    // Deduct hiring costs
-    agent.inventory.food -= HIRING_THRESHOLDS.hiring_cost_food;
-    agent.inventory.shelter -= HIRING_THRESHOLDS.hiring_cost_shelter;
-    agent.inventory.energy -= HIRING_THRESHOLDS.hiring_cost_energy;
+    // Find nearby unemployed candidates
+    const neighborIds = getAliveNeighborIds(grid, agent.position.x, agent.position.y, agents);
+    const candidates = shuffle(neighborIds.filter((nId) => {
+      const n = agents[nId];
+      // Must be alive, not already employed, not the employer's parent/child
+      return n.alive &&
+        !n.contract?.active &&
+        !n.employer_id &&
+        n.id !== agent.parent_id &&
+        !agent.children_ids.includes(n.id);
+    }));
 
-    const cell = pick(emptyCells);
-    const worker = createWorkerAgent(agent, cell.x, cell.y);
-    worker.net_worth = calcNetWorth(worker);
-    agents[worker.id] = worker;
-    grid[cell.y][cell.x] = worker.id;
-    agent.employee_ids.push(worker.id);
-    hiresThisTick++;
+    if (candidates.length === 0) continue;
 
     const emoji = AGENT_CONFIGS[agent.type].emoji;
-    const workerEmoji = AGENT_CONFIGS[worker.type].emoji;
-    newEvents.push({
-      id: eventId(),
-      tick,
-      type: "hire",
-      agents: [agent.id, worker.id],
-      message: `💼 ${emoji} ${agent.id} hired ${workerEmoji} ${worker.id} (worker)\n  Type: ${worker.type} | Contract: ${Math.round(REVENUE_SHARE_RATE * 100)}% revenue share`,
-    });
 
-    addMemory(agent, tick, `Hired worker ${worker.id}`, "positive", worker.id);
-    addMemory(worker, tick, `Started working for ${agent.id}`, "neutral", agent.id);
+    // Post job to first viable candidate
+    for (const candidateId of candidates) {
+      const candidate = agents[candidateId];
+      const candEmoji = AGENT_CONFIGS[candidate.type].emoji;
 
-    newSpawnFlashes.push({
-      position: { x: cell.x, y: cell.y },
-      timestamp: Date.now(),
-      type: "hire",
-    });
+      // Candidate evaluates the offer:
+      // Accept if: struggling (low health or needs unmet) OR cooperative + trusts employer
+      const isStruggling = candidate.health < 70 || candidate.ticks_needs_unmet >= 2;
+      const trustInEmployer = candidate.reputation[agent.id]?.trust_score ?? 0.5;
+      const willingToWork = candidate.traits.cooperation_bias > 0.4 && trustInEmployer >= 0.3;
 
-    // Clear the should_hire flag so they don't hire again this tick
-    if (agent.strategic_plan) {
-      agent.strategic_plan.should_hire = false;
+      if (!isStruggling && !willingToWork) {
+        // Rejected
+        newEvents.push({
+          id: eventId(),
+          tick,
+          type: "hire",
+          agents: [agent.id, candidate.id],
+          message: `💼 ${emoji} ${agent.id} offered job to ${candEmoji} ${candidate.id}\n  ❌ ${candEmoji} ${candidate.id}: "No thanks, I'm doing fine on my own."`,
+        });
+        addMemory(agent, tick, `${candidate.id} rejected my job offer`, "negative", candidate.id);
+        addMemory(candidate, tick, `Rejected job offer from ${agent.id}`, "neutral", agent.id);
+        continue;
+      }
+
+      // Accepted — create employment contract
+      // Employer pays signing bonus
+      const signingFood = HIRING_THRESHOLDS.hiring_cost_food;
+      const signingShelter = HIRING_THRESHOLDS.hiring_cost_shelter;
+      agent.inventory.food -= signingFood;
+      agent.inventory.shelter -= signingShelter;
+      candidate.inventory.food += signingFood;
+      candidate.inventory.shelter += signingShelter;
+
+      // Set up contract
+      candidate.employer_id = agent.id;
+      candidate.contract = {
+        employer_id: agent.id,
+        revenue_share: REVENUE_SHARE_RATE,
+        active: true,
+      };
+      agent.employee_ids.push(candidate.id);
+      hiresThisTick++;
+
+      newEvents.push({
+        id: eventId(),
+        tick,
+        type: "hire",
+        agents: [agent.id, candidate.id],
+        message: `💼 ${emoji} ${agent.id} hired ${candEmoji} ${candidate.id}\n  ✅ ${candEmoji} ${candidate.id}: "${isStruggling ? "I need the help." : "Sounds like a good deal."}"` +
+          `\n  Contract: ${Math.round(REVENUE_SHARE_RATE * 100)}% revenue share | Signing bonus: ${signingFood}🌾 ${signingShelter}🏠`,
+      });
+
+      addMemory(agent, tick, `Hired ${candidate.id} as worker`, "positive", candidate.id);
+      addMemory(candidate, tick, `Accepted job from ${agent.id} (${isStruggling ? "needed help" : "good deal"})`, "positive", agent.id);
+
+      // Update reputation — both sides trust each other more
+      updateReputation(agent, candidate.id, true);
+      updateReputation(candidate, agent.id, true);
+
+      // Clear flag
+      if (agent.strategic_plan) {
+        agent.strategic_plan.should_hire = false;
+      }
+      break; // Only hire one per tick
     }
   }
 

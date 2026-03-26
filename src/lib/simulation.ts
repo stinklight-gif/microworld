@@ -8,6 +8,7 @@ import {
   TickStats,
   Dynasty,
   Contract,
+  Experiment,
   AgentThinkRequest,
   AgentDecision,
   ReflectionDecision,
@@ -425,23 +426,26 @@ function getEmptyAdjacentCells(
 
 // ─── Initialize World ─────────────────────────────────────────────────────────
 
-export function initWorld(): WorldState {
+export function initWorld(experiment?: Experiment | null): WorldState {
   agentCounter = 0;
   eventCounter = 0;
 
-  const grid: (string | null)[][] = Array.from({ length: GRID_SIZE }, () =>
-    Array(GRID_SIZE).fill(null)
+  const gridSize = experiment?.grid_size ?? GRID_SIZE;
+  const popSize = experiment?.initial_agents ?? INITIAL_POPULATION;
+
+  const grid: (string | null)[][] = Array.from({ length: gridSize }, () =>
+    Array(gridSize).fill(null)
   );
   const agents: Record<string, Agent> = {};
 
   const positions: { x: number; y: number }[] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
       positions.push({ x, y });
     }
   }
   const shuffled = shuffle(positions);
-  const count = Math.min(INITIAL_POPULATION, shuffled.length);
+  const count = Math.min(popSize, shuffled.length);
 
   for (let i = 0; i < count; i++) {
     const pos = shuffled[i];
@@ -465,6 +469,9 @@ export function initWorld(): WorldState {
     thinkingInProgress: false,
     llmEnabled: false,
     dynasties: {},
+    activeExperiment: experiment ?? null,
+    firedEventTicks: [],
+    taxPool: { food: 0, shelter: 0 },
   };
 }
 
@@ -1072,6 +1079,9 @@ export function tickWorld(state: WorldState): WorldState {
     thinkingInProgress: state.thinkingInProgress,
     llmEnabled: state.llmEnabled,
     dynasties,
+    activeExperiment: state.activeExperiment,
+    firedEventTicks: state.firedEventTicks,
+    taxPool: state.taxPool,
   };
 }
 

@@ -734,8 +734,7 @@ export function tickWorld(state: WorldState): WorldState {
     const canReproduce =
       agent.ticks_at_full_health >= REPRODUCTION_THRESHOLDS.consecutive_full_health_ticks &&
       agent.inventory.food > REPRODUCTION_THRESHOLDS.min_food &&
-      agent.inventory.shelter > REPRODUCTION_THRESHOLDS.min_shelter &&
-      agent.inventory.energy > REPRODUCTION_THRESHOLDS.min_energy;
+      agent.inventory.shelter > REPRODUCTION_THRESHOLDS.min_shelter;
 
     // LLM can also trigger reproduction via strategic plan
     const llmWantsReproduce = agent.strategic_plan?.should_reproduce === true;
@@ -746,10 +745,10 @@ export function tickWorld(state: WorldState): WorldState {
     const emptyCells = getEmptyAdjacentCells(grid, agent.position.x, agent.position.y);
     if (emptyCells.length === 0) continue;
 
-    // Calculate surplus to share with child (50%)
+    // Calculate surplus to share with child (40%)
     const surplusFood = Math.floor((agent.inventory.food - SURVIVAL_NEEDS.food) * REPRODUCTION_THRESHOLDS.parent_surplus_share);
     const surplusShelter = Math.floor((agent.inventory.shelter - SURVIVAL_NEEDS.shelter) * REPRODUCTION_THRESHOLDS.parent_surplus_share);
-    const surplusEnergy = Math.floor((agent.inventory.energy) * REPRODUCTION_THRESHOLDS.parent_surplus_share);
+    const surplusEnergy = 2; // Give child a small energy start
 
     // Deduct from parent
     agent.inventory.food -= surplusFood;

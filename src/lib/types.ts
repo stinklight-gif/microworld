@@ -125,7 +125,8 @@ export type EventType =
   | "birth"
   | "hire"
   | "contract_break"
-  | "revenue_share";
+  | "revenue_share"
+  | "experiment";
 
 export interface WorldEvent {
   id: string;
@@ -186,6 +187,10 @@ export interface WorldState {
   thinkingInProgress: boolean;
   llmEnabled: boolean;
   dynasties: Record<string, Dynasty>; // Phase 5: founder_id -> dynasty
+  // Phase 6: Experiments
+  activeExperiment: Experiment | null;
+  firedEventTicks: number[]; // Track which scheduled events have already fired
+  taxPool: { food: number; shelter: number }; // For tax experiment
 }
 
 // ─── LLM API Types ───────────────────────────────────────────────────────────
@@ -248,4 +253,129 @@ export type ColorMode = "type" | "health" | "wealth";
 
 // ─── Chat Filter ──────────────────────────────────────────────────────────────
 
-export type ChatFilter = "all" | "trades" | "deaths" | "warnings" | "migrations" | "thoughts" | "family";
+export type ChatFilter = "all" | "trades" | "deaths" | "warnings" | "migrations" | "thoughts" | "family" | "experiments";
+
+// ─── Phase 6: Experiments ─────────────────────────────────────────────────────
+
+export type ExperimentEventType =
+  | "famine"
+  | "boost"
+  | "plague"
+  | "wall"
+  | "remove_wall"
+  | "tax_start"
+  | "tax_redistribute"
+  | "add_good";
+
+export interface ExperimentEvent {
+  trigger_tick: number;
+  type: ExperimentEventType;
+  config: Record<string, unknown>;
+}
+
+export interface Experiment {
+  id: string;
+  name: string;
+  description: string;
+  initial_agents?: number;
+  grid_size?: number;
+  events: ExperimentEvent[];
+}
+
+export const EXPERIMENT_PRESETS: Experiment[] = [
+  {
+    id: "baseline",
+    name: "Baseline",
+    description: "Default settings. 100 agents, 15×15 grid, no shocks.",
+    events: [],
+  },
+  {
+    id: "famine",
+    name: "Famine",
+    description: "At tick 200: destroy all food in a 5×5 region (top-left). Watch refugees flee, death spike, recovery.",
+    events: [
+      {
+        trigger_tick: 200,
+        type: "famine",
+        config: { region: { x1: 0, y1: 0, x2: 4, y2: 4 } },
+      },
+    ],
+  },
+  {
+    id: "monopoly",
+    name: "Monopoly",
+    description: "One agent at center starts with 10× production yields. Does a trade empire form?",
+    events: [
+      {
+        trigger_tick: 1,
+        type: "boost",
+        config: { target: "center", yield_multiplier: 10 },
+      },
+    ],
+  },
+  {
+    id: "tax",
+    name: "Tax & Redistribute",
+    description: "10% tax on all trades. Every 50 ticks the pool is redistributed equally. Helps or hurts?",
+    events: [
+      {
+        trigger_tick: 1,
+        type: "tax_start",
+        config: { rate: 0.1, redistribute_interval: 50 },
+      },
+    ],
+  },
+  {
+    id: "tech_shock",
+    name: "Technology Shock",
+    description: "At tick 300: all farmers get 2× food yield. Food glut, farmer boom, then crash?",
+    events: [
+      {
+        trigger_tick: 300,
+        type: "boost",
+        config: { target: "all_farmers", yield_multiplier: 2, good: "food" },
+      },
+    ],
+  },
+  {
+    id: "wall",
+    name: "Wall",
+    description: "Impassable barrier across row 7. Two isolated economies. At tick 500: wall removed.",
+    events: [
+      {
+        trigger_tick: 1,
+        type: "wall",
+        config: { row: 7 },
+      },
+      {
+        trigger_tick: 500,
+        type: "remove_wall",
+        config: { row: 7 },
+      },
+    ],
+  },
+  {
+    id: "plague",
+    name: "Plague",
+    description: "At tick 200: random 30% of agents lose 50 HP. Who survives? Do healthy exploit sick?",
+    events: [
+      {
+        trigger_tick: 200,
+        type: "plague",
+        config: { percent_affected: 0.3, hp_loss: 50 },
+      },
+    ],
+  },
+  {
+    id: "gold_rush",
+    name: "Gold Rush",
+    description: "At tick 100: introduce 'gold' good — doesn't decay, no survival need. Does it become currency?",
+    events: [
+      {
+        trigger_tick: 100,
+        type: "add_good",
+        config: { good: "gold", decay_rate: 0, survival_need: 0 },
+      },
+    ],
+  },
+];

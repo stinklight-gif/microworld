@@ -129,7 +129,8 @@ function doTrades(
   grid: (string | null)[][],
   tick: number,
   events: WorldEvent[],
-  flashes: TradeFlash[]
+  flashes: TradeFlash[],
+  taxPool?: { food: number; shelter: number }
 ): void {
   const tradeCount: Record<string, number> = {};
   const MAX_TRADES = 5;
@@ -201,6 +202,21 @@ function doTrades(
 
       tradeCount[id] = (tradeCount[id] || 0) + 1;
       tradeCount[nId] = (tradeCount[nId] || 0) + 1;
+
+      // Tax — skim a percentage of traded goods into pool
+      if (taxPool) {
+        const taxFood = offerGood === "food" ? Math.max(1, Math.floor(offerAmt * 0.1)) : 0;
+        const taxShelter = offerGood === "shelter" ? Math.max(1, Math.floor(offerAmt * 0.1)) : 0;
+        // Deduct tax from the recipient of each good
+        if (taxFood > 0) {
+          neighbor.inventory.food = Math.max(0, neighbor.inventory.food - taxFood);
+          taxPool.food += taxFood;
+        }
+        if (taxShelter > 0) {
+          neighbor.inventory.shelter = Math.max(0, neighbor.inventory.shelter - taxShelter);
+          taxPool.shelter += taxShelter;
+        }
+      }
 
       // Log event
       const fromEmoji = AGENT_CONFIGS[agent.type].emoji;
@@ -507,6 +523,150 @@ export function tickWorld(state: WorldState): WorldState {
   let hiresThisTick = 0;
   let contractBreaksThisTick = 0;
 
+  // Copy mutable experiment state
+  const firedEventTicks = [...state.firedEventTicks];
+  const taxPool = { ...state.taxPool };
+
+  // ─── 0. EXPERIMENT EVENTS — fire scheduled shocks ───────────────────────────
+  if (state.activeExperiment) {
+    for (const evt of state.activeExperiment.events) {
+      if (evt.trigger_tick !== tick) continue;
+      if (firedEventTicks.includes(tick)) continue;
+      firedEventTicks.push(tick);
+
+      const cfg = evt.config;
+
+      if (evt.type === "famine") {
+        // Destroy all food in a rectangular region
+        const region = cfg.region as { x1: number; y1: number; x2: number; y2: number };
+        let affected = 0;
+        for (const id of Object.keys(agents)) {
+          const a = agents[id];
+          if (!a.alive) continue;
+          if (a.position.x >= region.x1 && a.position.x <= region.x2 &&
+              a.position.y >= region.y1 && a.position.y <= region.y2) {
+            a.inventory.food = 0;
+            affected++;
+          }
+        }
+        newEvents.push({
+          id: eventId(), tick, type: "experiment", agents: [],
+          message: `⚡ EXPERIMENT: FAMINE\n  All food destroyed in region (${region.x1},${region.y1})→(${region.x2},${region.y2})\n  ${affected} agents affected. Watch for migration and death.`,
+        });
+
+      } else if (evt.type === "plague") {
+        // Random % of agents lose HP
+        const pct = (cfg.percent_affected as number) || 0.3;
+        const hpLoss = (cfg.hp_loss as number) || 50;
+        const alive = Object.values(agents).filter((a) => a.alive);
+        const victims = shuffle(alive.map((a) => a.id)).slice(0, Math.floor(alive.length * pct));
+        for (const vid of victims) {
+          agents[vid].health = Math.max(0, agents[vid].health - hpLoss);
+        }
+        newEvents.push({
+          id: eventId(), tick, type: "experiment", agents: victims,
+          message: `⚡ EXPERIMENT: PLAGUE\n  ${victims.length} agents lost ${hpLoss} HP (${Math.round(pct * 100)}% of population)\n  Who survives? Do healthy agents exploit the sick?`,
+        });
+
+      } else if (evt.type === "boost") {
+        const target = cfg.target as string;
+        const multiplier = (cfg.yield_multiplier as number) || 2;
+        const good = cfg.good as string | undefined;
+        let boosted = 0;
+
+        if (target === "center") {
+          // Boost center agent
+          const cx = Math.floor(grid.length / 2);
+          const centerId = grid[cx]?.[cx];
+          if (centerId && agents[centerId]?.alive) {
+            agents[centerId].production_yields.food *= multiplier;
+            agents[centerId].production_yields.shelter *= multiplier;
+            boosted = 1;
+          }
+          newEvents.push({
+            id: eventId(), tick, type: "experiment", agents: centerId ? [centerId] : [],
+            message: `⚡ EXPERIMENT: MONOPOLY\n  Center agent gets ${multiplier}× production yields\n  Does a trade empire form around them?`,
+          });
+        } else if (target === "all_farmers") {
+          for (const a of Object.values(agents)) {
+            if (!a.alive || a.type !== "farmer") continue;
+            if (good === "food") {
+              a.production_yields.food *= multiplier;
+            } else {
+              a.production_yields.food *= multiplier;
+              a.production_yields.shelter *= multiplier;
+            }
+            boosted++;
+          }
+          newEvents.push({
+            id: eventId(), tick, type: "experiment", agents: [],
+            message: `⚡ EXPERIMENT: TECHNOLOGY SHOCK\n  ${boosted} farmers now have ${multiplier}× ${good || "all"} yield\n  Food glut incoming. Farmer boom, then crash?`,
+          });
+        }
+
+      } else if (evt.type === "wall") {
+        const row = (cfg.row as number) || 7;
+        const gridWidth = grid[0]?.length || GRID_SIZE;
+        // Kill/remove agents on the wall row, then block it
+        for (let x = 0; x < gridWidth; x++) {
+          const occupant = grid[row]?.[x];
+          if (occupant && agents[occupant]) {
+            agents[occupant].alive = false;
+            agents[occupant].health = 0;
+          }
+          if (grid[row]) grid[row][x] = "WALL" as string;
+        }
+        newEvents.push({
+          id: eventId(), tick, type: "experiment", agents: [],
+          message: `⚡ EXPERIMENT: WALL\n  Impassable barrier placed across row ${row}\n  Two isolated economies now develop independently.`,
+        });
+
+      } else if (evt.type === "remove_wall") {
+        const row = (cfg.row as number) || 7;
+        const gridWidth = grid[0]?.length || GRID_SIZE;
+        for (let x = 0; x < gridWidth; x++) {
+          if (grid[row]?.[x] === "WALL") {
+            grid[row][x] = null;
+          }
+        }
+        newEvents.push({
+          id: eventId(), tick, type: "experiment", agents: [],
+          message: `⚡ EXPERIMENT: WALL REMOVED\n  Barrier at row ${row} removed. Watch economies equilibrate.`,
+        });
+
+      } else if (evt.type === "tax_start") {
+        // Tax is handled in the trade step — just announce it here
+        newEvents.push({
+          id: eventId(), tick, type: "experiment", agents: [],
+          message: `⚡ EXPERIMENT: TAX & REDISTRIBUTE\n  ${Math.round(((cfg.rate as number) || 0.1) * 100)}% tax on all trades. Pool redistributed every ${(cfg.redistribute_interval as number) || 50} ticks.`,
+        });
+      }
+    }
+
+    // Tax redistribution — check if it's a redistribution tick
+    const taxEvt = state.activeExperiment.events.find((e) => e.type === "tax_start");
+    if (taxEvt && tick > (taxEvt.trigger_tick || 1)) {
+      const interval = (taxEvt.config.redistribute_interval as number) || 50;
+      if (tick % interval === 0 && (taxPool.food > 0 || taxPool.shelter > 0)) {
+        const alive = Object.values(agents).filter((a) => a.alive);
+        if (alive.length > 0) {
+          const foodEach = Math.floor(taxPool.food / alive.length);
+          const shelterEach = Math.floor(taxPool.shelter / alive.length);
+          for (const a of alive) {
+            a.inventory.food += foodEach;
+            a.inventory.shelter += shelterEach;
+          }
+          newEvents.push({
+            id: eventId(), tick, type: "experiment", agents: [],
+            message: `⚡ TAX REDISTRIBUTION\n  ${taxPool.food}🌾 ${taxPool.shelter}🏠 distributed to ${alive.length} agents (${foodEach}🌾 ${shelterEach}🏠 each)`,
+          });
+          taxPool.food = 0;
+          taxPool.shelter = 0;
+        }
+      }
+    }
+  }
+
   const aliveIds = Object.keys(agents).filter((id) => agents[id].alive);
   const order = shuffle(aliveIds);
 
@@ -600,7 +760,8 @@ export function tickWorld(state: WorldState): WorldState {
   }
 
   // 3. TRADE
-  doTrades(agents, grid, tick, newEvents, newFlashes);
+  const hasTax = state.activeExperiment?.events.some((e) => e.type === "tax_start") ?? false;
+  doTrades(agents, grid, tick, newEvents, newFlashes, hasTax ? taxPool : undefined);
 
   let migrationsThisTick = 0;
 
@@ -1080,8 +1241,8 @@ export function tickWorld(state: WorldState): WorldState {
     llmEnabled: state.llmEnabled,
     dynasties,
     activeExperiment: state.activeExperiment,
-    firedEventTicks: state.firedEventTicks,
-    taxPool: state.taxPool,
+    firedEventTicks,
+    taxPool,
   };
 }
 

@@ -1,18 +1,35 @@
 "use client";
 
-import { Agent } from "@/lib/types";
+import { Agent, Dynasty } from "@/lib/types";
 import { AGENT_CONFIGS } from "@/lib/constants";
 
 interface AgentDetailCardProps {
   agent: Agent | null;
+  agents: Record<string, Agent>;
+  dynasties: Record<string, Dynasty>;
   onClose: () => void;
+  onSelectAgent: (id: string) => void;
 }
 
-export default function AgentDetailCard({ agent, onClose }: AgentDetailCardProps) {
+export default function AgentDetailCard({ agent, agents, dynasties, onClose, onSelectAgent }: AgentDetailCardProps) {
   if (!agent) return null;
 
   const cfg = AGENT_CONFIGS[agent.type];
   const healthPct = Math.max(0, agent.health);
+
+  // Find dynasty for this agent
+  const findDynasty = (): Dynasty | null => {
+    // Check if agent IS a founder
+    if (dynasties[agent.id]) return dynasties[agent.id];
+    // Walk up the family tree to find founder
+    let current = agent;
+    while (current.parent_id && agents[current.parent_id]) {
+      current = agents[current.parent_id];
+      if (dynasties[current.id]) return dynasties[current.id];
+    }
+    return null;
+  };
+  const dynasty = findDynasty();
 
   return (
     <div className="detail-card">
@@ -113,6 +130,89 @@ export default function AgentDetailCard({ agent, onClose }: AgentDetailCardProps
           </div>
         )}
       </div>
+
+      {/* Family Tree */}
+      {(agent.parent_id || agent.children_ids.length > 0 || dynasty) && (
+        <div className="detail-section">
+          <div className="detail-label">👪 Family</div>
+          <div className="family-info">
+            <div className="family-row">
+              <span className="family-key">Generation:</span>
+              <span className="family-value">{agent.generation}</span>
+            </div>
+            {agent.parent_id && (
+              <div className="family-row">
+                <span className="family-key">Parent:</span>
+                <button className="agent-link" onClick={() => onSelectAgent(agent.parent_id!)}>
+                  {agent.parent_id}
+                </button>
+              </div>
+            )}
+            {agent.children_ids.length > 0 && (
+              <div className="family-row">
+                <span className="family-key">Children:</span>
+                <span className="family-children">
+                  {agent.children_ids.map((cid) => (
+                    <button key={cid} className="agent-link" onClick={() => onSelectAgent(cid)}>
+                      {cid}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            )}
+            {dynasty && (
+              <div className="dynasty-info">
+                <span className="dynasty-badge">👑 Dynasty of {dynasty.founder_id}</span>
+                <span className="dynasty-stat">{dynasty.members.length} living | {dynasty.total_ever} total | ⊕{dynasty.total_net_worth}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Employment */}
+      {(agent.employer_id || agent.employee_ids.length > 0 || agent.contract) && (
+        <div className="detail-section">
+          <div className="detail-label">💼 Employment</div>
+          <div className="employment-info">
+            {agent.contract && agent.contract.active && agent.employer_id && (
+              <div className="contract-info">
+                <span className="contract-badge">📋 Worker</span>
+                <div className="family-row">
+                  <span className="family-key">Employer:</span>
+                  <button className="agent-link" onClick={() => onSelectAgent(agent.employer_id!)}>
+                    {agent.employer_id}
+                  </button>
+                </div>
+                <div className="family-row">
+                  <span className="family-key">Revenue share:</span>
+                  <span className="family-value">{Math.round(agent.contract.revenue_share * 100)}%</span>
+                </div>
+              </div>
+            )}
+            {agent.contract && !agent.contract.active && (
+              <div className="contract-info contract-inactive">
+                <span className="contract-badge">🔓 Independent (ex-worker)</span>
+              </div>
+            )}
+            {agent.employee_ids.length > 0 && (
+              <div className="employees-info">
+                <span className="contract-badge">👔 Employer</span>
+                <div className="family-row">
+                  <span className="family-key">Workers:</span>
+                  <span className="family-children">
+                    {agent.employee_ids.map((eid) => (
+                      <button key={eid} className="agent-link" onClick={() => onSelectAgent(eid)}>
+                        {eid}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Strategic Plan */}
       {agent.strategic_plan && (

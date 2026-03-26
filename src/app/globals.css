@@ -1181,3 +1181,179 @@ body {
   min-width: 28px;
   text-align: right;
 }
+
+/* ─── Phase 5: Family & Employment ─────────────────────────────────────────── */
+
+.family-info,
+.employment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.family-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+.family-key {
+  color: var(--text-muted);
+  min-width: 70px;
+}
+
+.family-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.family-children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.agent-link {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.agent-link:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #c7d2fe;
+}
+
+.dynasty-info {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: rgba(250, 204, 21, 0.08);
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dynasty-badge {
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.dynasty-stat {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+}
+
+.contract-info {
+  padding: 6px 8px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contract-info.contract-inactive {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.contract-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #22d3ee;
+}
+
+.contract-inactive .contract-badge {
+  color: var(--text-muted);
+}
+
+.employees-info {
+  padding: 6px 8px;
+  background: rgba(244, 114, 182, 0.08);
+  border: 1px solid rgba(244, 114, 182, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.employees-info .contract-badge {
+  color: #f472b6;
+}
+
+/* ─── Phase 5: Dashboard Summary Stats ─────────────────────────────────────── */
+
+.dashboard-summary {
+  display: flex;
+  gap: 8px;
+  padding: 0 4px;
+  margin-bottom: 8px;
+}
+
+.summary-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.summary-card:hover {
+  border-color: var(--border-active);
+}
+
+.summary-icon {
+  font-size: 1rem;
+}
+
+.summary-value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.summary-label {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.summary-birth {
+  border-left: 3px solid #f472b6;
+}
+
+.summary-employment {
+  border-left: 3px solid #22d3ee;
+}
+
+.summary-dynasty {
+  border-left: 3px solid #fbbf24;
+}
+
+.summary-dynasties {
+  border-left: 3px solid #a78bfa;
+}
+

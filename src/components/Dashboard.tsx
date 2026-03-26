@@ -14,12 +14,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TickStats, Agent } from "@/lib/types";
+import { TickStats, Agent, Dynasty } from "@/lib/types";
 import { AGENT_COLORS } from "@/lib/constants";
 
 interface DashboardProps {
   statsHistory: TickStats[];
   agents: Record<string, Agent>;
+  dynasties: Record<string, Dynasty>;
   speed: number;
   onSelectAgent: (id: string) => void;
 }
@@ -27,6 +28,7 @@ interface DashboardProps {
 export default function Dashboard({
   statsHistory,
   agents,
+  dynasties,
   speed,
   onSelectAgent,
 }: DashboardProps) {
@@ -93,6 +95,27 @@ export default function Dashboard({
     [onSelectAgent]
   );
 
+  // Phase 5 stats
+  const birthRate = useMemo(() => {
+    const last10 = statsHistory.slice(-10);
+    if (last10.length === 0) return 0;
+    const totalBirths = last10.reduce((s, t) => s + (t.births || 0), 0);
+    return (totalBirths / last10.length).toFixed(1);
+  }, [statsHistory]);
+
+  const employmentRate = useMemo(() => {
+    const aliveAgents = Object.values(agents).filter((a) => a.alive);
+    if (aliveAgents.length === 0) return 0;
+    const employed = aliveAgents.filter((a) => a.contract && a.contract.active).length;
+    return Math.round((employed / aliveAgents.length) * 100);
+  }, [agents]);
+
+  const largestDynasty = useMemo(() => {
+    const dynastyList = Object.values(dynasties);
+    if (dynastyList.length === 0) return null;
+    return dynastyList.reduce((best, d) => (d.members.length > best.members.length ? d : best), dynastyList[0]);
+  }, [dynasties]);
+
   return (
     <div className={`dashboard ${collapsed ? "dashboard-collapsed" : ""}`}>
       <button
@@ -108,6 +131,30 @@ export default function Dashboard({
 
       {!collapsed && (
         <div className="dashboard-content">
+          {/* Phase 5 Summary Stats */}
+          <div className="dashboard-summary">
+            <div className="summary-card summary-birth">
+              <span className="summary-icon">🎉</span>
+              <span className="summary-value">{birthRate}</span>
+              <span className="summary-label">Births/10t</span>
+            </div>
+            <div className="summary-card summary-employment">
+              <span className="summary-icon">💼</span>
+              <span className="summary-value">{employmentRate}%</span>
+              <span className="summary-label">Employed</span>
+            </div>
+            <div className="summary-card summary-dynasty">
+              <span className="summary-icon">👑</span>
+              <span className="summary-value">{largestDynasty ? largestDynasty.members.length : 0}</span>
+              <span className="summary-label">{largestDynasty ? `Dynasty: ${largestDynasty.founder_id}` : "No dynasties"}</span>
+            </div>
+            <div className="summary-card summary-dynasties">
+              <span className="summary-icon">🏰</span>
+              <span className="summary-value">{Object.keys(dynasties).length}</span>
+              <span className="summary-label">Dynasties</span>
+            </div>
+          </div>
+
           <div className="dashboard-charts">
             {/* Chart 1: Population */}
             <div className="chart-card">

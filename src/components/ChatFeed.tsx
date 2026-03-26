@@ -16,6 +16,7 @@ const FILTER_OPTIONS: { value: ChatFilter; label: string }[] = [
   { value: "warnings", label: "Warnings" },
   { value: "migrations", label: "Moves" },
   { value: "thoughts", label: "Thoughts" },
+  { value: "family", label: "Family" },
 ];
 
 function filterEvents(events: WorldEvent[], filter: ChatFilter, search: string): WorldEvent[] {
@@ -34,6 +35,10 @@ function filterEvents(events: WorldEvent[], filter: ChatFilter, search: string):
   } else if (filter === "thoughts") {
     filtered = filtered.filter(
       (e) => e.type === "strategic_thought" || e.type === "reflection"
+    );
+  } else if (filter === "family") {
+    filtered = filtered.filter(
+      (e) => e.type === "birth" || e.type === "hire" || e.type === "contract_break" || e.type === "revenue_share"
     );
   }
 
@@ -65,6 +70,14 @@ function getEventColor(type: string): string {
       return "#a78bfa";
     case "reflection":
       return "#c084fc";
+    case "birth":
+      return "#f472b6";
+    case "hire":
+      return "#22d3ee";
+    case "contract_break":
+      return "#fb923c";
+    case "revenue_share":
+      return "#fbbf24";
     default:
       return "var(--text-secondary)";
   }
@@ -86,6 +99,14 @@ function getEventIcon(type: string): string {
       return "🧠";
     case "reflection":
       return "💭";
+    case "birth":
+      return "🎉";
+    case "hire":
+      return "💼";
+    case "contract_break":
+      return "🔓";
+    case "revenue_share":
+      return "💰";
     default:
       return "📌";
   }

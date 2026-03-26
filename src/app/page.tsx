@@ -262,7 +262,10 @@ export default function Home() {
             {selectedAgent ? (
               <AgentDetailCard
                 agent={selectedAgent}
+                agents={world.agents}
+                dynasties={world.dynasties}
                 onClose={() => setSelectedAgentId(null)}
+                onSelectAgent={handleSelectAgent}
               />
             ) : (
               <div className="detail-placeholder">
@@ -323,6 +326,7 @@ export default function Home() {
       <Dashboard
         statsHistory={world.statsHistory}
         agents={world.agents}
+        dynasties={world.dynasties}
         speed={world.speed}
         onSelectAgent={handleSelectAgent}
       />

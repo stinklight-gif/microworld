@@ -97,11 +97,39 @@ export default function GridCanvas({
           ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
           ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
 
+          // Worker indicator — small dot in employer's color
+          if (agent.contract && agent.contract.active && agent.employer_id) {
+            const employer = world.agents[agent.employer_id];
+            if (employer) {
+              const empColor = AGENT_COLORS[employer.type];
+              ctx.fillStyle = empColor;
+              const dotSize = Math.max(3, cellSize / 5);
+              ctx.fillRect(px + cellSize - dotSize - 2, py + 2, dotSize, dotSize);
+            }
+          }
+
           // Selected highlight
           if (agentId === selectedAgentId) {
             ctx.strokeStyle = "#ffffff";
             ctx.lineWidth = 2;
             ctx.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+          }
+
+          // Dynasty highlight — when a family member is selected, highlight all dynasty members
+          if (selectedAgentId && agentId !== selectedAgentId) {
+            const selectedAgent = world.agents[selectedAgentId];
+            if (selectedAgent) {
+              const isFamilyMember =
+                agent.parent_id === selectedAgentId ||
+                selectedAgent.parent_id === agentId ||
+                selectedAgent.children_ids.includes(agentId) ||
+                agent.children_ids.includes(selectedAgentId);
+              if (isFamilyMember) {
+                ctx.strokeStyle = "rgba(244, 114, 182, 0.7)"; // pink
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+              }
+            }
           }
         } else {
           ctx.fillStyle = "#14142a";
@@ -136,7 +164,6 @@ export default function GridCanvas({
       const toCx = flash.to.x * cellSize + cellSize / 2;
       const toCy = flash.to.y * cellSize + cellSize / 2;
 
-      // Draw line between trading agents
       ctx.beginPath();
       ctx.moveTo(fromCx, fromCy);
       ctx.lineTo(toCx, toCy);
@@ -144,21 +171,38 @@ export default function GridCanvas({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Glow on the cells
       const glowAlpha = alpha * 0.3;
       ctx.fillStyle = `rgba(34, 197, 94, ${glowAlpha})`;
-      ctx.fillRect(
-        flash.from.x * cellSize + 1,
-        flash.from.y * cellSize + 1,
-        cellSize - 2,
-        cellSize - 2
-      );
-      ctx.fillRect(
-        flash.to.x * cellSize + 1,
-        flash.to.y * cellSize + 1,
-        cellSize - 2,
-        cellSize - 2
-      );
+      ctx.fillRect(flash.from.x * cellSize + 1, flash.from.y * cellSize + 1, cellSize - 2, cellSize - 2);
+      ctx.fillRect(flash.to.x * cellSize + 1, flash.to.y * cellSize + 1, cellSize - 2, cellSize - 2);
+    }
+
+    // ── Spawn Flash Animation (births & hires) ──
+    for (const flash of (world.spawnFlashes || [])) {
+      const age = now - flash.timestamp;
+      if (age > 800) continue;
+      const alpha = Math.max(0, 1 - age / 800) * 0.8;
+      const scale = 1 + (age / 800) * 0.5; // Slight expansion
+
+      const cx = flash.position.x * cellSize + cellSize / 2;
+      const cy = flash.position.y * cellSize + cellSize / 2;
+      const radius = (cellSize / 2) * scale;
+
+      const color = flash.type === "birth"
+        ? `rgba(244, 114, 182, ${alpha})` // pink for birth
+        : `rgba(34, 211, 238, ${alpha})`; // cyan for hire
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Inner glow
+      ctx.fillStyle = flash.type === "birth"
+        ? `rgba(244, 114, 182, ${alpha * 0.2})`
+        : `rgba(34, 211, 238, ${alpha * 0.2})`;
+      ctx.fill();
     }
   }, [world, cellSize, colorMode, selectedAgentId, getAgentColor]);
 

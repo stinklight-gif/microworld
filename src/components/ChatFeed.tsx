@@ -17,6 +17,7 @@ const FILTER_OPTIONS: { value: ChatFilter; label: string }[] = [
   { value: "migrations", label: "Moves" },
   { value: "thoughts", label: "Thoughts" },
   { value: "family", label: "Family" },
+  { value: "experiments", label: "⚡ Events" },
 ];
 
 function filterEvents(events: WorldEvent[], filter: ChatFilter, search: string): WorldEvent[] {
@@ -40,6 +41,8 @@ function filterEvents(events: WorldEvent[], filter: ChatFilter, search: string):
     filtered = filtered.filter(
       (e) => e.type === "birth" || e.type === "hire" || e.type === "contract_break" || e.type === "revenue_share"
     );
+  } else if (filter === "experiments") {
+    filtered = filtered.filter((e) => e.type === "experiment");
   }
 
   if (search.trim()) {
@@ -78,6 +81,8 @@ function getEventColor(type: string): string {
       return "#fb923c";
     case "revenue_share":
       return "#fbbf24";
+    case "experiment":
+      return "#ff6b35";
     default:
       return "var(--text-secondary)";
   }
@@ -107,6 +112,8 @@ function getEventIcon(type: string): string {
       return "🔓";
     case "revenue_share":
       return "💰";
+    case "experiment":
+      return "⚡";
     default:
       return "📌";
   }
@@ -228,7 +235,7 @@ export default function ChatFeed({ events, agents, onSelectAgent }: ChatFeedProp
           filteredEvents.map((event) => (
             <div
               key={event.id}
-              className="chat-event"
+              className={`chat-event${event.type === "experiment" ? " chat-event-experiment" : ""}`}
               style={{
                 borderLeftColor: getEventColor(event.type),
               }}

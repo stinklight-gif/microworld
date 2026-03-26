@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { WorldState, Agent, ColorMode, AgentDecision, ReflectionDecision } from "@/lib/types";
+import { WorldState, Agent, ColorMode, Experiment, AgentDecision, ReflectionDecision } from "@/lib/types";
 import {
   initWorld,
   tickWorld,
@@ -125,7 +125,12 @@ export default function Home() {
 
   const handleReset = useCallback(() => {
     setSelectedAgentId(null);
-    setWorld(initWorld());
+    setWorld((prev) => initWorld(prev.activeExperiment));
+  }, []);
+
+  const handleExperimentChange = useCallback((experiment: Experiment | null) => {
+    setSelectedAgentId(null);
+    setWorld(initWorld(experiment));
   }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
@@ -183,12 +188,14 @@ export default function Home() {
         running={world.running}
         speed={world.speed}
         colorMode={colorMode}
+        activeExperiment={world.activeExperiment}
         onPlay={handlePlay}
         onPause={handlePause}
         onStep={handleStep}
         onReset={handleReset}
         onSpeedChange={handleSpeedChange}
         onColorModeChange={setColorMode}
+        onExperimentChange={handleExperimentChange}
       />
 
       {/* Main Content — Two Panel Layout */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ColorMode } from "@/lib/types";
+import { ColorMode, Experiment, EXPERIMENT_PRESETS } from "@/lib/types";
 
 interface ControlsBarProps {
   tick: number;
@@ -9,12 +9,14 @@ interface ControlsBarProps {
   running: boolean;
   speed: number;
   colorMode: ColorMode;
+  activeExperiment: Experiment | null;
   onPlay: () => void;
   onPause: () => void;
   onStep: () => void;
   onReset: () => void;
   onSpeedChange: (speed: number) => void;
   onColorModeChange: (mode: ColorMode) => void;
+  onExperimentChange: (experiment: Experiment | null) => void;
 }
 
 export default function ControlsBar({
@@ -24,13 +26,23 @@ export default function ControlsBar({
   running,
   speed,
   colorMode,
+  activeExperiment,
   onPlay,
   onPause,
   onStep,
   onReset,
   onSpeedChange,
   onColorModeChange,
+  onExperimentChange,
 }: ControlsBarProps) {
+  const handleExperimentSelect = (id: string) => {
+    const preset = EXPERIMENT_PRESETS.find((e) => e.id === id) ?? null;
+    onExperimentChange(preset);
+  };
+
+  // Find next scheduled event for active experiment
+  const nextEvent = activeExperiment?.events.find((e) => e.trigger_tick > tick);
+
   return (
     <div className="controls-bar">
       {/* Playback Controls */}
@@ -50,6 +62,29 @@ export default function ControlsBar({
         <button onClick={onReset} className="control-btn" title="Reset">
           <span className="control-icon">🔄</span>
         </button>
+      </div>
+
+      {/* Experiment Dropdown */}
+      <div className="controls-group">
+        <label className="control-label">Experiment</label>
+        <select
+          className="experiment-select"
+          value={activeExperiment?.id ?? "baseline"}
+          onChange={(e) => handleExperimentSelect(e.target.value)}
+          disabled={running}
+          title={activeExperiment?.description ?? "Select an experiment preset"}
+        >
+          {EXPERIMENT_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        {nextEvent && (
+          <span className="experiment-next" title={`Next: ${nextEvent.type} at tick ${nextEvent.trigger_tick}`}>
+            ⚡{nextEvent.trigger_tick}
+          </span>
+        )}
       </div>
 
       {/* Speed Slider */}

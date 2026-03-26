@@ -175,6 +175,51 @@ body {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
+/* ─── Experiment Dropdown ──────────────────────────────────────────────────── */
+.experiment-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+  max-width: 130px;
+}
+
+.experiment-select:hover:not(:disabled) {
+  border-color: var(--border-active);
+}
+
+.experiment-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.experiment-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.experiment-select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.experiment-next {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: #ff6b35;
+  background: rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 /* ─── Stat Badges ──────────────────────────────────────────────────────────── */
 .stat-badge {
   display: flex;

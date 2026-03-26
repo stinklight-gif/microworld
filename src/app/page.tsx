@@ -111,6 +111,70 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.running, world.speed, world.thinkingInProgress, doLLMThinking]);
 
+  // Push monitor snapshot every 10 ticks
+  useEffect(() => {
+    if (world.tick === 0 || world.tick % 10 !== 0) return;
+
+    const alive = Object.values(world.agents).filter((a) => a.alive);
+    const sorted = [...alive].sort((a, b) => b.net_worth - a.net_worth);
+    const stats = world.statsHistory;
+    const totalTradesExec = stats.reduce((s, t) => s + t.trades_executed, 0);
+    const totalTradesRej = stats.reduce((s, t) => s + t.trades_rejected, 0);
+    const totalBirths = stats.reduce((s, t) => s + (t.births || 0), 0);
+    const totalDeaths = stats.reduce((s, t) => s + t.deaths, 0);
+    const totalHires = stats.reduce((s, t) => s + (t.hires || 0), 0);
+    const totalBreaks = stats.reduce((s, t) => s + (t.contract_breaks || 0), 0);
+    const activeContracts = alive.filter((a) => a.contract?.active).length;
+    const dynastyList = Object.values(world.dynasties);
+    const largest = dynastyList.length > 0
+      ? dynastyList.reduce((b, d) => d.members.length > b.members.length ? d : b, dynastyList[0])
+      : null;
+    const lastGini = stats.length > 0 ? stats[stats.length - 1].gini_coefficient : 0;
+    const lastHealth = stats.length > 0 ? stats[stats.length - 1].avg_health : 0;
+
+    const snapshot = {
+      tick: world.tick,
+      running: world.running,
+      speed: world.speed,
+      population: {
+        total: alive.length,
+        farmer: alive.filter((a) => a.type === "farmer").length,
+        builder: alive.filter((a) => a.type === "builder").length,
+        energist: alive.filter((a) => a.type === "energist").length,
+        generalist: alive.filter((a) => a.type === "generalist").length,
+      },
+      economy: {
+        gini_coefficient: lastGini,
+        avg_health: lastHealth,
+        total_trades_executed: totalTradesExec,
+        total_trades_rejected: totalTradesRej,
+        total_births: totalBirths,
+        total_deaths: totalDeaths,
+        total_hires: totalHires,
+        total_contract_breaks: totalBreaks,
+        active_contracts: activeContracts,
+        largest_dynasty: largest ? { founder: largest.founder_id, members: largest.members.length } : null,
+      },
+      recent_events: world.events.slice(-5).map((e) => `[Tick ${e.tick}] ${e.message.split("\n")[0]}`),
+      top_agents: sorted.slice(0, 3).map((a) => ({
+        id: a.id, type: a.type, net_worth: Math.round(a.net_worth),
+        health: a.health, employees: a.employee_ids.length, children: a.children_ids.length,
+      })),
+      bottom_agents: sorted.slice(-3).reverse().map((a) => ({
+        id: a.id, type: a.type, net_worth: Math.round(a.net_worth),
+        health: a.health, ticks_starving: a.ticks_needs_unmet,
+      })),
+      experiment: world.activeExperiment?.id ?? "baseline",
+      updated_at: Date.now(),
+    };
+
+    fetch("/api/monitor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snapshot),
+    }).catch(() => {}); // Fire and forget
+  }, [world.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePlay = useCallback(() => {
     setWorld((prev) => ({ ...prev, running: true }));
   }, []);

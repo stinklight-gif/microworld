@@ -76,10 +76,10 @@ export const STARTING_INVENTORY = { energy: 5, food: 6, shelter: 4 };
 
 // ─── Phase 5: Reproduction & Hiring ───────────────────────────────────────────
 export const REPRODUCTION_THRESHOLDS = {
-  consecutive_full_health_ticks: 5,
-  min_food: 6,       // > 6 means surplus
-  min_shelter: 4,    // > 4 means surplus
-  min_energy: 10,    // > 10 means surplus
+  consecutive_full_health_ticks: 3,
+  min_food: 5,       // Must have > 5 food
+  min_shelter: 3,    // Must have > 3 shelter
+  min_energy: 4,     // Must have > 4 energy (budget is 8/tick, most spent on production)
   parent_surplus_share: 0.5, // parent gives 50% of surplus to child
 };
 

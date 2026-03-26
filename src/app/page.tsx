@@ -217,6 +217,61 @@ export default function Home() {
     setWorld((prev) => ({ ...prev, llmEnabled: !prev.llmEnabled }));
   }, []);
 
+  const handleSave = useCallback(() => {
+    setWorld((prev) => {
+      const paused = { ...prev, running: false };
+      const key = `microworld_${paused.activeExperiment?.id ?? "baseline"}_t${paused.tick}_${Date.now()}`;
+      try {
+        localStorage.setItem(key, JSON.stringify(paused));
+      } catch { /* localStorage full — still download */ }
+
+      // Also download as .json file
+      const blob = new Blob([JSON.stringify(paused, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${key}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      return paused;
+    });
+  }, []);
+
+  const handleLoad = useCallback((state: WorldState) => {
+    setSelectedAgentId(null);
+    setWorld({ ...state, running: false });
+  }, []);
+
+  const handleLoadFile = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const state = JSON.parse(e.target?.result as string) as WorldState;
+        handleLoad(state);
+      } catch { alert("Invalid save file."); }
+    };
+    reader.readAsText(file);
+  }, [handleLoad]);
+
+  const getSaveSlots = useCallback((): { key: string; label: string }[] => {
+    const slots: { key: string; label: string }[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("microworld_")) {
+        // Parse key: microworld_<experiment>_t<tick>_<timestamp>
+        const parts = key.replace("microworld_", "").split("_");
+        const exp = parts[0] || "baseline";
+        const tickPart = parts[1] || "";
+        const tsPart = parts[2] || "";
+        const ts = parseInt(tsPart);
+        const date = isNaN(ts) ? "" : new Date(ts).toLocaleTimeString();
+        slots.push({ key, label: `${exp} ${tickPart} ${date}` });
+      }
+    }
+    return slots.sort((a, b) => b.key.localeCompare(a.key));
+  }, []);
+
   const selectedAgent = selectedAgentId
     ? world.agents[selectedAgentId] ?? null
     : null;
@@ -260,6 +315,10 @@ export default function Home() {
         onSpeedChange={handleSpeedChange}
         onColorModeChange={setColorMode}
         onExperimentChange={handleExperimentChange}
+        onSave={handleSave}
+        onLoad={handleLoad}
+        onLoadFile={handleLoadFile}
+        getSaveSlots={getSaveSlots}
       />
 
       {/* Main Content — Two Panel Layout */}

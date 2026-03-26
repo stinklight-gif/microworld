@@ -77,6 +77,17 @@ export default function Dashboard({
     }));
   }, [chartData]);
 
+  // Births & Hires chart data (last 50 ticks)
+  const familyData = useMemo(() => {
+    const last50 = chartData.slice(-50);
+    return last50.map((s) => ({
+      tick: s.tick,
+      births: s.births || 0,
+      hires: s.hires || 0,
+      breaks: s.contract_breaks || 0,
+    }));
+  }, [chartData]);
+
   // Leaderboard
   const leaderboard = useMemo(() => {
     const aliveAgents = Object.values(agents)
@@ -98,10 +109,25 @@ export default function Dashboard({
   // Phase 5 stats
   const birthRate = useMemo(() => {
     const last10 = statsHistory.slice(-10);
-    if (last10.length === 0) return 0;
+    if (last10.length === 0) return "0";
     const totalBirths = last10.reduce((s, t) => s + (t.births || 0), 0);
     return (totalBirths / last10.length).toFixed(1);
   }, [statsHistory]);
+
+  const cumulativeBirths = useMemo(() =>
+    statsHistory.reduce((s, t) => s + (t.births || 0), 0),
+    [statsHistory]
+  );
+
+  const cumulativeHires = useMemo(() =>
+    statsHistory.reduce((s, t) => s + (t.hires || 0), 0),
+    [statsHistory]
+  );
+
+  const cumulativeBreaks = useMemo(() =>
+    statsHistory.reduce((s, t) => s + (t.contract_breaks || 0), 0),
+    [statsHistory]
+  );
 
   const employmentRate = useMemo(() => {
     const aliveAgents = Object.values(agents).filter((a) => a.alive);
@@ -114,6 +140,12 @@ export default function Dashboard({
     const dynastyList = Object.values(dynasties);
     if (dynastyList.length === 0) return null;
     return dynastyList.reduce((best, d) => (d.members.length > best.members.length ? d : best), dynastyList[0]);
+  }, [dynasties]);
+
+  const topDynasties = useMemo(() => {
+    return Object.values(dynasties)
+      .sort((a, b) => b.members.length - a.members.length)
+      .slice(0, 3);
   }, [dynasties]);
 
   return (
@@ -135,23 +167,23 @@ export default function Dashboard({
           <div className="dashboard-summary">
             <div className="summary-card summary-birth">
               <span className="summary-icon">🎉</span>
-              <span className="summary-value">{birthRate}</span>
-              <span className="summary-label">Births/10t</span>
+              <span className="summary-value">{birthRate}<span className="summary-sub">/{cumulativeBirths}</span></span>
+              <span className="summary-label">Births/10t · total</span>
             </div>
             <div className="summary-card summary-employment">
               <span className="summary-icon">💼</span>
-              <span className="summary-value">{employmentRate}%</span>
-              <span className="summary-label">Employed</span>
+              <span className="summary-value">{employmentRate}%<span className="summary-sub">·{cumulativeHires}</span></span>
+              <span className="summary-label">Employed · hires</span>
             </div>
             <div className="summary-card summary-dynasty">
               <span className="summary-icon">👑</span>
               <span className="summary-value">{largestDynasty ? largestDynasty.members.length : 0}</span>
-              <span className="summary-label">{largestDynasty ? `Dynasty: ${largestDynasty.founder_id}` : "No dynasties"}</span>
+              <span className="summary-label">{largestDynasty ? `Best: ${largestDynasty.founder_id}` : "No dynasties"}</span>
             </div>
             <div className="summary-card summary-dynasties">
-              <span className="summary-icon">🏰</span>
-              <span className="summary-value">{Object.keys(dynasties).length}</span>
-              <span className="summary-label">Dynasties</span>
+              <span className="summary-icon">🔓</span>
+              <span className="summary-value">{cumulativeBreaks}<span className="summary-sub">/{Object.keys(dynasties).length}🏰</span></span>
+              <span className="summary-label">Quits · dynasties</span>
             </div>
           </div>
 
@@ -289,7 +321,37 @@ export default function Dashboard({
               </ResponsiveContainer>
             </div>
 
-            {/* Chart 4: Average Health */}
+            {/* Chart 4: Births & Hires */}
+            <div className="chart-card">
+              <h4 className="chart-title">Births & Hires</h4>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={familyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis
+                    dataKey="tick"
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    stroke="#334155"
+                  />
+                  <YAxis
+                    tick={{ fill: "#64748b", fontSize: 10 }}
+                    stroke="#334155"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="births" stackId="family" fill="#f472b6" name="Births" />
+                  <Bar dataKey="hires" stackId="family" fill="#22d3ee" name="Hires" />
+                  <Bar dataKey="breaks" stackId="family" fill="#fb923c" name="Quits" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Chart 5: Average Health */}
             <div className="chart-card">
               <h4 className="chart-title">Average Health</h4>
               <ResponsiveContainer width="100%" height={160}>
@@ -368,6 +430,25 @@ export default function Dashboard({
                 )}
               </div>
             </div>
+            {topDynasties.length > 0 && (
+              <div className="leaderboard-section">
+                <span className="leaderboard-label">👑 Top Dynasties</span>
+                <div className="leaderboard-agents">
+                  {topDynasties.map((d) => (
+                    <button
+                      key={d.founder_id}
+                      className="leaderboard-agent leaderboard-dynasty"
+                      onClick={() => handleAgentClick(d.founder_id)}
+                    >
+                      <span className="leaderboard-name">{d.founder_id}</span>
+                      <span className="leaderboard-worth">
+                        {d.members.length} living · {d.total_ever} total
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

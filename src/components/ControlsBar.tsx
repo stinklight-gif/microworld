@@ -21,6 +21,7 @@ interface ControlsBarProps {
   onSave: () => void;
   onLoad: (state: WorldState) => void;
   onLoadFile: (file: File) => void;
+  onExport: () => void;
   getSaveSlots: () => { key: string; label: string }[];
 }
 
@@ -42,6 +43,7 @@ export default function ControlsBar({
   onSave,
   onLoad,
   onLoadFile,
+  onExport,
   getSaveSlots,
 }: ControlsBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +146,13 @@ export default function ControlsBar({
             e.target.value = "";
           }}
         />
+      </div>
+
+      {/* Export */}
+      <div className="controls-group">
+        <button onClick={onExport} className="control-btn" title="Export run data (ZIP)">
+          <span className="control-icon">📊</span>
+        </button>
       </div>
 
       {/* Experiment Dropdown */}
